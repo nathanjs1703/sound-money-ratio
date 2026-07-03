@@ -1,0 +1,15 @@
+# Virtual environment
+.venv/
+venv/
+
+# Python cache
+__pycache__/
+*.pyc
+
+# Project-generated data and output
+cache/
+btc-gold-chart.html
+
+# OS / editor cruft
+.DS_Store
+*.swp
