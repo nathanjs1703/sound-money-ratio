@@ -9,7 +9,7 @@ import plotly.graph_objects as go
 import yfinance as yf
 
 CACHE_DIR = Path("cache")
-CACHE_MAX_AGE_IN_DAYS = 3
+CACHE_MAX_AGE_IN_DAYS = 7
 DEFAULT_HOLDING_PERIOD_IN_DAYS = 180
 OUTPUT_CHART_FILE = Path("btc-gold-chart.html")
 
@@ -130,27 +130,18 @@ def compute_windows(ratio_df: pd.DataFrame, holding_period_days: int) -> pd.Data
             f"Holding period (in days) must be less than {len(ratio_df) - 1}."
         )
 
-    # accumulate results in list of dicts to build windows DataFrame
-    windows = []
+    entry_ratio = ratio_df["ratio"]
+    exit_ratio = ratio_df["ratio"].shift(-holding_period_days)
 
-    for entry_date, row in ratio_df.iterrows():
-        exit_date = entry_date + pd.Timedelta(days=holding_period_days)
-        if exit_date in ratio_df.index:
-            entry_ratio = row["ratio"]
-            exit_ratio = ratio_df.loc[exit_date, "ratio"]
-            profitable = exit_ratio > entry_ratio
+    windows = pd.DataFrame({
+        "entry_date": ratio_df.index,
+        "entry_ratio": entry_ratio.values,
+        "exit_date": ratio_df.index + pd.Timedelta(days=holding_period_days),
+        "exit_ratio": exit_ratio.values,
+        "profitable": (exit_ratio > entry_ratio).values,
+    })
 
-            windows.append(
-                {
-                    "entry_date": entry_date,
-                    "entry_ratio": entry_ratio,
-                    "exit_date": exit_date,
-                    "exit_ratio": exit_ratio,
-                    "profitable": profitable,
-                }
-            )
-
-    return pd.DataFrame(windows)
+    return windows.dropna(subset=["exit_ratio"]).reset_index(drop=True)
 
 
 def calculate_success_rate(windows_df: pd.DataFrame) -> float:
