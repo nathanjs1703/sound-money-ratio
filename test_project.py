@@ -128,6 +128,25 @@ def test_compute_windows_lengths():
     assert len(compute_windows(ratio_df, len(ratio_df) - 2)) == 2
 
 
+@pytest.mark.parametrize("holding_period, expected", [
+    (1, [True, False, False, False, True, False]),
+    (2, [True, False, False, True, True]),
+    (3, [True, False, True, True]),
+    (4, [True, True, False]),
+    (5, [True, False]),
+])
+def test_compute_windows_characterization(holding_period, expected):
+    dates = pd.date_range(start="2014-09-17", periods=7, freq="D")
+    ratio_df = pd.DataFrame(
+        {"ratio": [1.0, 2.0, 2.0, 1.5, 1.5, 3.0, 2.0]},
+        index=dates,
+    )
+
+    result = compute_windows(ratio_df, holding_period)
+
+    assert result["profitable"].tolist() == expected
+
+
 ######################## calculate_success_rate tests #########################
 
 
