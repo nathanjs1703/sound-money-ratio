@@ -10,21 +10,41 @@ import yfinance as yf
 
 CACHE_DIR = Path("cache")
 CACHE_MAX_AGE_IN_DAYS = 7
+DEFAULT_BASE = "gold"
 DEFAULT_HOLDING_PERIOD_IN_DAYS = 180
 OUTPUT_CHART_FILE = Path("btc-gold-chart.html")
+BASE_PRESENTATION = {
+    "gold": {
+        "held_asset": "bitcoin",
+        "numerator": "BTC",
+        "denominator": "Gold",
+        "unit": "oz gold per BTC",
+    },
+    "bitcoin": {
+        "held_asset": "gold",
+        "numerator": "Gold",
+        "denominator": "BTC",
+        "unit": "BTC per oz gold",
+    },
+}
 
 
 def fetch_price_data(asset_name: str) -> pd.DataFrame:
-    """
-    Get daily price data for BTC or Gold, using a local CSV cache to avoid
-    repeated API calls, fresh up to the CACHE_MAX_AGE_IN_DAYS
+    """Get daily price data for BTC or gold, using a local CSV cache.
 
-    :param asset_name: "bitcoin" or "gold"
-    :type asset_name: str
-    :raise KeyError: If asset_name is not "bitcoin" or "gold"
-    :return: A pandas DataFrame indexed by date (Datetimeindex), with a single
-        column "price" (float, USD)
-    :rtype: pd.DataFrame
+    Avoids repeated API calls by reading from cache when the cached file is
+    fresher than CACHE_MAX_AGE_IN_DAYS. Network failures from yfinance
+    propagate uncaught.
+
+    Args:
+        asset_name: Either "bitcoin" or "gold".
+
+    Returns:
+        DataFrame indexed by date (DatetimeIndex) with a single column
+        "price" (float, USD).
+
+    Raises:
+        KeyError: If asset_name is not "bitcoin" or "gold".
     """
 
     asset_dict = {
@@ -35,7 +55,6 @@ def fetch_price_data(asset_name: str) -> pd.DataFrame:
     ticker = asset_dict[asset_name]["ticker"]
     cache_file = asset_dict[asset_name]["cache_file"]
 
-    # construct the full path to the cache file
     cache_path = CACHE_DIR / cache_file
 
     if cache_path.exists():
@@ -58,33 +77,41 @@ def fetch_price_data(asset_name: str) -> pd.DataFrame:
 
 
 def align_and_compute_ratio(
-    btc_df: pd.DataFrame, gold_df: pd.DataFrame
+    btc_df: pd.DataFrame, gold_df: pd.DataFrame, base: str = DEFAULT_BASE
 ) -> pd.DataFrame:
-    """
-    Outer-join the two price series on the dateindex of each DataFrame; reindex
-    to a continuous daily range. Forward-filling is done with epistemic
-    conservatism. When the gold market is closed (weekends) or the data
-    provider has a gap (occasional missing days), the last known price is used
-    rather than interpolated or backfilled. This makes sure the downstream
-    window analysis is done with a price that existed at the time. Finally, it
-    computes the BTC/Gold ratio
+    """Align the two price series and compute the ratio in the chosen base.
 
-    :param btc_df: Bitcoin DataFrame
-    :type btc_df: pd.DataFrame
-    :param gold_df: Gold DataFrame
-    :type gold_df: pd.DataFrame
-    :raise TypeError: btc_df or gold_df is not a DataFrame
-    :return: A pandas DataFrame indexed by every calendar day from the first
-        BTC trading day to the most recent available date with columns
-        "price_btc", "price_gold", "ratio"
-    :rtype: pd.DataFrame
+    Outer-joins the two series on date, reindexes to a continuous daily range,
+    and forward-fills gaps. Forward-filling is chosen for epistemic
+    conservatism: when the gold market is closed (weekends) or the provider
+    has a gap, the last known price is propagated rather than interpolated or
+    backfilled, so the downstream window analysis only ever sees prices that
+    actually existed at the time.
+
+    The ratio is constructed directly from the two price series in whichever
+    direction the chosen base implies. This is kept as the final step so a
+    future supply-adjust transform can slot in ahead of it.
+
+    Args:
+        btc_df: Bitcoin prices, indexed by date.
+        gold_df: Gold prices, indexed by date.
+        base: The asset you start and end in: "gold" or "bitcoin". Selects the
+            numerator and denominator of the ratio at construction.
+
+    Returns:
+        DataFrame indexed by every calendar day from the first BTC trading day
+        to the most recent available date, with columns "price_btc",
+        "price_gold", and "ratio".
+
+    Raises:
+        TypeError: If btc_df or gold_df is not a DataFrame.
+        ValueError: If base is not "gold" or "bitcoin".
     """
 
     # guard against non-DataFrame input
     if not isinstance(btc_df, pd.DataFrame) or not isinstance(gold_df, pd.DataFrame):
         raise TypeError("btc_df and gold_df must be pandas DataFrames")
 
-    # to join data sets
     combined = btc_df.join(gold_df, how="outer", lsuffix="_btc", rsuffix="_gold")
 
     # to fill missing rows from data provider
@@ -98,27 +125,39 @@ def align_and_compute_ratio(
     # drop leading rows where bitcoin has no data yet
     combined = combined.dropna(subset=["price_btc"])
 
-    # compute ratio
-    combined["ratio"] = combined["price_btc"] / combined["price_gold"]
+    # compute ratio in the chosen base's direction
+    if base == "gold":
+        combined["ratio"] = combined["price_btc"] / combined["price_gold"]
+    elif base == "bitcoin":
+        combined["ratio"] = combined["price_gold"] / combined["price_btc"]
+    else:
+        raise ValueError(f'base must be "gold" or "bitcoin", got {base!r}')
 
     return combined
 
 
 def compute_windows(ratio_df: pd.DataFrame, holding_period_days: int) -> pd.DataFrame:
-    """
-    Generate every valid holding-period window from the ratio time series and
-    classify each as profitable or not
+    """Generate every valid holding-period window and classify profitability.
 
-    :param ratio_df: Ratio DataFrame from align_and_compute_ratio
-    :type ratio_df: pd.DataFrame
-    :param holding_period_days: Number of days between hypothetical entry into
-        BTC and exit back to gold
-    :type holding_period_days: int
-    :raise ValueError: If holding_period_days is less than or equal to zero or
-        greater than or equal to len(ratio_df) - 1
-    :return: A DataFrame with one row per valid window. Columns: entry_date,
-        entry_ratio, exit_date, exit_ratio, profitable (bool)
-    :rtype: pd.DataFrame
+    Vectorized with a row-shift (.shift), which is equivalent to a calendar-day
+    exit lookup only because ratio_df has a dense daily index — one row per
+    calendar day, guaranteed upstream by align_and_compute_ratio's
+    reindex + ffill.
+
+    Profitability is base-agnostic: a window is profitable when the exit ratio
+    exceeds the entry ratio, whichever asset is the base.
+
+    Args:
+        ratio_df: Ratio DataFrame from align_and_compute_ratio.
+        holding_period_days: Days between hypothetical entry into the held
+            asset and exit back to the base asset.
+
+    Returns:
+        DataFrame with one row per valid window. Columns: entry_date,
+        entry_ratio, exit_date, exit_ratio, profitable (bool).
+
+    Raises:
+        ValueError: If holding_period_days is <= 0 or >= len(ratio_df) - 1.
     """
 
     # filtering holding_period_days too small or too large
@@ -133,66 +172,66 @@ def compute_windows(ratio_df: pd.DataFrame, holding_period_days: int) -> pd.Data
     entry_ratio = ratio_df["ratio"]
     exit_ratio = ratio_df["ratio"].shift(-holding_period_days)
 
-    windows = pd.DataFrame({
-        "entry_date": ratio_df.index,
-        "entry_ratio": entry_ratio.values,
-        "exit_date": ratio_df.index + pd.Timedelta(days=holding_period_days),
-        "exit_ratio": exit_ratio.values,
-        "profitable": (exit_ratio > entry_ratio).values,
-    })
+    windows = pd.DataFrame(
+        {
+            "entry_date": ratio_df.index,
+            "entry_ratio": entry_ratio.values,
+            "exit_date": ratio_df.index + pd.Timedelta(days=holding_period_days),
+            "exit_ratio": exit_ratio.values,
+            "profitable": (exit_ratio > entry_ratio).values,
+        }
+    )
 
     return windows.dropna(subset=["exit_ratio"]).reset_index(drop=True)
 
 
 def calculate_success_rate(windows_df: pd.DataFrame) -> float:
-    """
-    Compute the fraction of windows in which BTC outperformed Gold
+    """Compute the fraction of windows where the held asset profited.
 
-    :param windows_df: Windows DataFrame from compute_windows
-    :type windows_df: pd.DataFrame
-    :raise ValueError: If windows_df is empty
-    :return: A float between 0.0 and 1.0 representing the fraction of windows
-        that were profitable.
-    :rtype: float
+    Args:
+        windows_df: Windows DataFrame from compute_windows.
+
+    Returns:
+        Fraction of windows that were profitable, between 0.0 and 1.0.
+
+    Raises:
+        ValueError: If windows_df is empty.
     """
 
     if windows_df.empty:
         raise ValueError("Empty DataFrame.")
 
     # mean of a bool column = fraction that are True
-    return windows_df["profitable"].mean()
+    return float(windows_df["profitable"].mean())
 
 
 def amend_ratio_with_profitability(
     ratio_df: pd.DataFrame, windows_df: pd.DataFrame
 ) -> pd.DataFrame:
-    """
-    Copy ratio_df and windows_df so as not to mutate; trim the current holding
-    period window off the tail of ratio_df; re-index windows_df and add
-    profitable column to ratio_df
+    """Attach per-window profitability back onto the ratio time series.
 
-    :param ratio_df: Ratio DataFrame from align_and_compute_ratio
-    :type ratio_df: pd.DataFrame
-    :param windows_df: Windows DataFrame from compute_windows
-    :type windows_df: pd.DataFrame
-    :return: A DataFrame with one row per valid window. Columns: ratio,
-        profitable (bool)
-    :rtype: pd.DataFrame
+    Copies both inputs, trims the trailing holding-period window off ratio_df
+    (those dates have no exit yet), and joins the profitable column on the
+    date index.
+
+    Args:
+        ratio_df: Ratio DataFrame from align_and_compute_ratio.
+        windows_df: Windows DataFrame from compute_windows.
+
+    Returns:
+        DataFrame indexed by date with columns "ratio" and "profitable" (bool).
     """
 
     # create DataFrame copies to avoid mutation
     ratio_df = ratio_df.copy()
     windows_df = windows_df.copy()
 
-    # trim window off tail of ratio_df
     last_entry_date = windows_df["entry_date"].max()
     ratio_df = ratio_df.loc[:last_entry_date]
 
     # index by entry_date so the subsequent column assignment aligns on date
     windows_df = windows_df.set_index("entry_date")
 
-    # add "profitable" column of windows_df on to ratio_df
-    # pandas aligns on the date index
     ratio_df["profitable"] = windows_df["profitable"]
 
     return ratio_df
@@ -203,24 +242,26 @@ def generate_chart(
     output_path: Path,
     holding_period_days: int,
     success_rate: float,
+    base: str,
 ) -> None:
-    """
-    Render the BTC/Gold ratio time series with windows color-coded green
-    (profitable) or red (not profitable) and save as standalone HTML
+    """Render the ratio time series as a color-coded chart and save as HTML.
 
-    :param ratio_df: Ratio DataFrame from amend_ratio_with_profitability
-    :type ratio_df: pd.DataFrame
-    :param output_path: This is the relative path where the file
-        should be saved
-    :type output_path: Path
-    :param holding_period_days: Number of holding period days enter
-        at command line
-    :type holding_period_days: int
-    :param success_rate: fraction given by calculate_success_rate
-    :type success_rate: float
-    :return: Side effect, the file is written to disk
-    :rtype: None
+    Windows are filled green (profitable) or red (not profitable). Titles and
+    axis labels are composed from BASE_PRESENTATION so that every surface
+    describes the same base asset.
+
+    Args:
+        ratio_df: Ratio DataFrame from amend_ratio_with_profitability.
+        output_path: Relative path where the HTML file is written.
+        holding_period_days: Holding period used for the analysis.
+        success_rate: Fraction from calculate_success_rate.
+        base: The asset you start and end in: "gold" or "bitcoin".
+
+    Returns:
+        None. The chart is written to output_path as a side effect.
     """
+
+    ratio_df = ratio_df.copy()
 
     # mark a new segment each time the profitable value flips
     ratio_df["segment"] = (
@@ -248,44 +289,61 @@ def generate_chart(
             )
         )
 
+    labels = BASE_PRESENTATION[base]
+    ratio_name = f"{labels['numerator']}/{labels['denominator']}"
+
     fig.update_layout(
         title=(
-            f"BTC/Gold Ratio — Holding Period: {holding_period_days} days, "
+            f"{ratio_name} Ratio — Holding Period: {holding_period_days} days, "
             f"Historical Success Rate: {success_rate:.1%}"
         ),
         xaxis_title="Date",
-        yaxis_title="BTC/Gold Ratio (oz)",
+        yaxis_title=f"{ratio_name} Ratio ({labels['unit']})",
     )
 
     fig.write_html(output_path)
 
 
-def main():
-    """
-    Orchestrate the flow: Parse command line arguments, call fetch_price_data
-    twice, call align_and_compute_ratio, call compute_windows,
-    call calculate_success_rate, call amend_ratio_with_profitability, call
-    generate_chart, print success rate and path to chart
+def main() -> None:
+    """Orchestrate the flow from CLI arguments to rendered chart.
+
+    Parses arguments, resolves defaults, fetches both price series, computes
+    the ratio in the chosen base asset, classifies windows, calculates the
+    success rate, renders the chart, and reports the result.
     """
 
     parser = argparse.ArgumentParser(
         description="Analyze Bitcoin/Gold holding period profitability"
     )
     parser.add_argument(
+        "--base",
+        default=None,
+        choices=["gold", "bitcoin"],
+        help=f"Asset to measure from: gold or bitcoin (default: {DEFAULT_BASE})",
+    )
+    parser.add_argument(
         "holding_period",
         nargs="?",
         default=None,
         type=int,
-        help=f"Number of days to hold BTC before converting back to gold "
+        help="Number of days to hold the bought and held "
+        "asset before converting back to base asset "
         f"(default: {DEFAULT_HOLDING_PERIOD_IN_DAYS})",
     )
 
     args = parser.parse_args()
 
+    # handle no base argument with sentinel
+    if args.base is None:
+        print(f"No base asset specified, using default of {DEFAULT_BASE}")
+        base = DEFAULT_BASE
+    else:
+        base = args.base
+
     # handle no argument with sentinel
     if args.holding_period is None:
         print(
-            f"No holding period specified, using default of "
+            "No holding period specified, using default of "
             f"{DEFAULT_HOLDING_PERIOD_IN_DAYS} days"
         )
         holding_period_days = DEFAULT_HOLDING_PERIOD_IN_DAYS
@@ -295,7 +353,7 @@ def main():
     try:
         btc = fetch_price_data("bitcoin")
         gold = fetch_price_data("gold")
-        ratio_df = align_and_compute_ratio(btc, gold)
+        ratio_df = align_and_compute_ratio(btc, gold, base=base)
         windows_df = compute_windows(
             ratio_df,
             holding_period_days=holding_period_days,
@@ -307,9 +365,15 @@ def main():
             output_path=OUTPUT_CHART_FILE,
             holding_period_days=holding_period_days,
             success_rate=success_rate,
+            base=base,
         )
 
-        print(f"Historical Success Rate: {success_rate:.1%}")
+        labels = BASE_PRESENTATION[base]
+
+        print(
+            f"\n\nHolding {labels['held_asset']} for {holding_period_days} days was "
+            f"profitable in {base} in {success_rate:.1%} of historical windows.\n\n"
+        )
         print(f"Chart saved to {OUTPUT_CHART_FILE}")
 
         print("Attempting to open chart in your browser...")

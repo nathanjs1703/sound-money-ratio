@@ -1,3 +1,4 @@
+from project import BASE_PRESENTATION
 from project import fetch_price_data
 from project import align_and_compute_ratio
 from project import compute_windows
@@ -5,6 +6,16 @@ from project import calculate_success_rate
 from project import amend_ratio_with_profitability
 import pytest
 import pandas as pd
+
+
+########################### BASE_PRESENTATION test ############################
+
+
+def test_base_presentation_structure():
+    for base in ("gold", "bitcoin"):
+        labels = BASE_PRESENTATION[base]
+        assert set(labels) == {"held_asset", "numerator", "denominator", "unit"}
+
 
 ############################ fetch_price_data test ############################
 
@@ -20,8 +31,19 @@ def test_fetch_price_data_invalid_asset():
 
 def test_align_and_compute_ratio_wrong_type():
 
-    with pytest.raises(TypeError):
+    with pytest.raises(TypeError, match="btc_df and gold_df must be pandas DataFrames"):
         align_and_compute_ratio("bitcoin", "gold")
+
+
+def test_align_and_compute_ratio_invalid_base():
+
+    dates_btc = pd.date_range(start="2014-09-17", periods=3, freq="D")
+    dates_gold = pd.date_range(start="2014-09-17", periods=3, freq="D")
+    btc_df = pd.DataFrame({"price": [100, 200, 150]}, index=dates_btc)
+    gold_df = pd.DataFrame({"price": [10, 20, 25]}, index=dates_gold)
+
+    with pytest.raises(ValueError, match="gold"):
+        align_and_compute_ratio(btc_df, gold_df, base="silver")
 
 
 def test_align_and_compute_ratio_general():
@@ -29,34 +51,16 @@ def test_align_and_compute_ratio_general():
     dates_btc = pd.date_range(start="2014-09-17", periods=10, freq="D")
     dates_gold = pd.date_range(start="2014-09-07", periods=15, freq="B")
     btc_df = pd.DataFrame(
-        {"price": [100, 200, 150, 300, 270, 200, 360, 312, 500, 455]},
+        {"price": [100, 200, 150, 300, 240, 200, 375, 325, 600, 500]},
         index=dates_btc,
     )
-
     gold_df = pd.DataFrame(
-        {
-            "price": [
-                10,
-                20,
-                25,
-                50,
-                25,
-                30,
-                20,
-                40,
-                50,
-                30,
-                40,
-                60,
-                65,
-                40,
-                35,
-            ]
-        },
+        {"price": [10, 20, 25, 50, 25, 30, 20, 40, 50, 30, 40, 60, 65, 52, 32]},
         index=dates_gold,
     )
-
     btc_df = btc_df.drop(index=pd.Timestamp("2014-09-25"))
+
+    expected_gold = [2.5, 4.0, 5.0, 10.0, 8.0, 5.0, 6.25, 5.0, 6.25, 15.625]
 
     assert len(align_and_compute_ratio(btc_df, gold_df)) == 10
     assert align_and_compute_ratio(btc_df, gold_df).columns.tolist() == [
@@ -64,18 +68,30 @@ def test_align_and_compute_ratio_general():
         "price_gold",
         "ratio",
     ]
-    assert align_and_compute_ratio(btc_df, gold_df)["ratio"].tolist() == [
-        2.5,
-        4.0,
-        5.0,
-        10.0,
-        9.0,
-        5.0,
-        6.0,
-        4.8,
-        7.8,
-        13.0,
-    ]
+    assert (
+        align_and_compute_ratio(btc_df, gold_df, base="gold")["ratio"].tolist()
+        == expected_gold
+    )
+    # defaulted base must route to gold
+    assert align_and_compute_ratio(btc_df, gold_df)["ratio"].tolist() == expected_gold
+
+
+def test_align_and_compute_ratio_bitcoin_base():
+
+    dates_btc = pd.date_range(start="2014-09-17", periods=10, freq="D")
+    dates_gold = pd.date_range(start="2014-09-07", periods=15, freq="B")
+    btc_df = pd.DataFrame(
+        {"price": [100, 200, 150, 300, 240, 200, 375, 325, 600, 500]},
+        index=dates_btc,
+    )
+    gold_df = pd.DataFrame(
+        {"price": [10, 20, 25, 50, 25, 30, 20, 40, 50, 30, 40, 60, 65, 52, 32]},
+        index=dates_gold,
+    )
+    btc_df = btc_df.drop(index=pd.Timestamp("2014-09-25"))
+
+    result = align_and_compute_ratio(btc_df, gold_df, base="bitcoin")["ratio"].tolist()
+    assert result == [0.4, 0.25, 0.2, 0.1, 0.125, 0.2, 0.16, 0.2, 0.16, 0.064]
 
 
 ############################ compute_windows tests ############################
@@ -128,13 +144,16 @@ def test_compute_windows_lengths():
     assert len(compute_windows(ratio_df, len(ratio_df) - 2)) == 2
 
 
-@pytest.mark.parametrize("holding_period, expected", [
-    (1, [True, False, False, False, True, False]),
-    (2, [True, False, False, True, True]),
-    (3, [True, False, True, True]),
-    (4, [True, True, False]),
-    (5, [True, False]),
-])
+@pytest.mark.parametrize(
+    "holding_period, expected",
+    [
+        (1, [True, False, False, False, True, False]),
+        (2, [True, False, False, True, True]),
+        (3, [True, False, True, True]),
+        (4, [True, True, False]),
+        (5, [True, False]),
+    ],
+)
 def test_compute_windows_characterization(holding_period, expected):
     dates = pd.date_range(start="2014-09-17", periods=7, freq="D")
     ratio_df = pd.DataFrame(
@@ -169,7 +188,9 @@ def test_calculate_success_rate_small_dataframe():
         == 0.50
     )
     assert (
-        calculate_success_rate(pd.DataFrame({"profitable": [False, False, True, False]}))
+        calculate_success_rate(
+            pd.DataFrame({"profitable": [False, False, True, False]})
+        )
         == 0.25
     )
     assert (
@@ -206,15 +227,11 @@ def test_amend_ratio_with_profitability():
             "profitable": [True, False, True],
         }
     )
+    result = amend_ratio_with_profitability(ratio_df, windows_df)
 
-    assert len(amend_ratio_with_profitability(ratio_df, windows_df)) == len(windows_df)
-    assert amend_ratio_with_profitability(ratio_df, windows_df).columns.tolist() == [
-        "ratio",
-        "profitable",
-    ]
-    assert amend_ratio_with_profitability(ratio_df, windows_df)[
-        "profitable"
-    ].tolist() == [True, False, True]
+    assert result.columns.tolist() == ["ratio", "profitable"]
+    assert result.index.tolist() == dates_ratio[:3].tolist()
+    assert result["profitable"].tolist() == [True, False, True]
 
 
 ###############################################################################

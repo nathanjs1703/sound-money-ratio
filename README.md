@@ -1,149 +1,126 @@
-# Bitcoin over Gold Windows
+# Sound Money Ratio
 
-#### Video Demo: [CS50P Final Project - Bitcoin Over Gold Windows](https://youtu.be/G4X1AkcEQB0)
+![Python](https://img.shields.io/badge/python-3.14-blue)
+![License](https://img.shields.io/badge/license-MIT-green)
+![Code style](https://img.shields.io/badge/code%20style-black-000000)
 
-#### Description: Historical analysis of how often bitcoin has outperformed gold over user-specified holding periods.
+The proportion of all possible holding periods in which bitcoin has outperformed gold, or gold bitcoin, across their full shared history.
 
-### Project Overview
+| Short holds | Long holds |
+|:---:|:---:|
+| ![BTC/Gold ratio, 30-day hold — green and red windows in roughly even stripes](assets/chart-30d.png) | ![BTC/Gold ratio, 752-day hold — mostly green with occasional red bands](assets/chart-752d.png) |
+| Gold base, 30-day hold · as of 2026-07-14 · near even | Gold base, 752-day hold · as of 2026-07-14 · 75.2% of windows profitable |
 
-This project uses Python to answer a simple question: if I own gold and I am thinking about buying bitcoin with it and holding it for a while, what are the chances I'll end up with more gold than I started with? The future is opaque to us, but we can look at the history. For every possible day in the past where someone could have made this trade, this tool checks whether holding bitcoin for the chosen length of time would have left them ahead or behind. The ratio or percentage that came out ahead is the answer the tool gives you.
 
-Most analysis involving bitcoin or gold is measured in dollars. However, with constant historical debasement distorting the real economic signal I feel it is more instructive to see the direct relationship between these two important hard monetary primitives. Thus the non-dollar-centric framing is an intentional design philosophy.
+## What this answers
 
-### How to use it
+If you own bitcoin or gold and are considering trading into the other asset and holding for a while, what are the chances you end up with more than what you started with?
 
-##### Setup
+The future is opaque, but the past is not. For every day in the price history where someone could have made that trade, this tool checks whether holding for your chosen period would have left them ahead or behind. The share of windows that came out ahead is the answer the tool gives you.
 
-1. Receive the project (cloned or downloaded)
-2. `cd` into the project directory
-3. Make a fresh virtual environment with `python3 -m venv .venv` and `source .venv/bin/activate`
-4. Execute a `pip install -r requirements.txt` to get all the necessary third-party packages not in Python's standard library.
+Most bitcoin and gold analysis is denominated in dollars. However, with constant historical debasement distorting the real economic signal I feel it is more instructive to see the direct relationship. Measuring the two hard monetary assets directly against each other removes that distortion. Thus the non-dollar framing and the symmetry between bitcoin and gold are both intentional design philosophies.
 
-##### Running the tool
+## Quickstart
 
-1. Once those are installed successfully then execute `python3 project.py <days>` in the terminal, where `<days>` is the integer number of days for the desired holding period. If you do not enter an argument the tool will use the pre-selected default of 180 days.
-2. If this is your first time to use the tool then first it will download the price data CSV files in a folder called cache from the Yahoo Finance API. This will be evident by the `[*****100%*****] 1 of 1 completed`  (which are yfinance's progress bars) printed and by the appearance of the cache folders and the price data CSV files. If you have these files already and it has been less than the configured cache freshness window since their download then the tool will use the cached files instead of hitting the API and re-downloading them.
-3. Next you will see the `Historical Success Rate: XX.X%` and `Chart saved to btc-gold-chart.html and opened in your browser` printed in the terminal.
-4. Finally and most importantly, the BTC/Gold Ratio Chart will automatically be opened in your browser and also saved as `btc-gold-chart.html` in the project folder. If it doesn't open automatically, open the file manually. 
+```bash
+git clone https://github.com/nathanjs1703/sound-money-ratio.git
+cd sound-money-ratio
+python3 -m venv .venv && source .venv/bin/activate
+pip install -r requirements.txt
 
-### Interpreting the results
+python3 project.py --base gold 180
+```
 
-In the chart you will see the entire BTC/Gold ratio over the available history, going back to the earliest date the bitcoin data provider has data, typically around 2014, up to the present, or the latest data provided, minus the selected holding period. The area under each point on the line is colored green if a window starting on that date was profitable, or red if not. The Historical Success Rate at the top of this chart and printed to the terminal is simply the portion of this time that was profitable or green. One may understand this to be a rough probability of being profitable over this holding period starting today and going into the future based on this past data, if past trends roughly continue (see Known limitations).
+```
+Holding bitcoin for 180 days was profitable in gold in XX.X% of historical windows.
 
-### File descriptions
+Chart saved to btc-gold-chart.html
+```
 
-##### project.py
+The chart opens in your browser automatically and is saved to the project folder.
 
-The main project file project.py is a python script that consists of:
-- The import section (Python Standard Library and third-party)
-- Constants
-- 6 custom functions: 
-    - `fetch_price_data`
-    - `align_and_compute_ratio`
-    - `compute_windows`
-    - `calculate_success_rate`
-    - `amend_ratio_with_profitability`
-    - `generate_chart`
-- `main`
-- the usual `if __name__ == "__main__":` guard
+**Arguments.** `--base` is the asset you start and end in (`gold` or `bitcoin`); the positional argument is the holding period in days. Both are optional. The tool defaults to gold and 180 days, and tells you when it does.
 
-The 7 functions are organized with `main` at the bottom orchestrating and calling the other 6 custom functions.
+```bash
+python3 project.py                      # gold base, 180 days
+python3 project.py --base bitcoin 90    # bitcoin base, 90 days
+```
 
-The architectural flow of the script follows:
- **data → analysis → visualization**
- 
- Where **data** consists of: 
- - `fetch_price_data`
- 
- **analysis** consists of:
- - `align_and_compute_ratio`
- - `compute_windows`
- - `calculate_success_rate`
- - `amend_ratio_with_profitability`
- 
- And finally **visualization** is accomplished by:
- - `generate_chart`.
+**First run** downloads price history from Yahoo Finance into a `cache/` folder (you'll see yfinance's progress bars). Subsequent runs reuse the cache until it goes stale.
 
-##### test_project.py
+**Tests:** `pytest` from the project root.
 
-The project file for testing project.py is test_project.py.
+## Reading the chart
 
-This file tests: 
-- `fetch_price_data` with one test
-- `align_and_compute_ratio` with two tests
-- `compute_windows` with four tests
-- `calculate_success_rate` with two tests
-- `amend_ratio_with_profitability` with one test
+The chart plots the full ratio history — from the earliest date bitcoin price data exists (around 2014) to the most recent data available, minus the holding period at the tail, since those dates have no exit yet.
 
-for a total of 10 tests across five of the six custom functions. `main` and `generate_chart` are excluded because they only produce side effects. `fetch_price_data` is tested only for its invalid-asset error, since its main job hits the API.
+Each point on the line is an entry date. The area beneath it is **green** if a window opening on that date closed profitably, and **red** if it did not. The Historical Success Rate is simply the green share.
 
-To run the tests with project.py and test_project.py in your project folder, run `pytest` in the terminal from this folder.
+With a **gold base**, the chart shows the BTC/Gold ratio in oz of gold per BTC, and historically has been trending up. With a **bitcoin base**, it shows the Gold/BTC ratio in BTC per oz of gold, and historically has been trending down. These are the reciprocal histories with reciprocal charts, not the same chart flipped.  However, the two success rates are exact complements: a window profitable in one base is unprofitable in the other, so the rates sum to 1. (A window that ended exactly where it began would belong to neither. However, at daily float precision that never occurs.)
 
-##### requirements.txt
+The success rate is a historical frequency, not an infallible forecast. See [Known limitations](#known-limitations).
 
-This file, requirements.txt, is a simple text document listing the project's required third-party packages: `pandas`, `yfinance`, `plotly`, and `pytest`. 
+## Design decisions
 
-It can be installed with the instructions in "How to use it" above.
+**Base asset neutrality.** The original version hardcoded a hidden premise: _gold is home_. You started in gold, bought bitcoin, sold back to gold, and "profitable" meant ending with more gold. The bias was mostly in the _direction of the question_, not the code. The tool hid the mirror question: was holding gold good for a bitcoin-owner?
 
-##### cache/
+Rather than compute the original BTC/Gold and then invert it for the bitcoin case, the chosen base selects the numerator and denominator at construction inside `align_and_compute_ratio`, either `price_btc / price_gold` or `price_gold / price_btc`, both built directly from each dollar-denominated price series. Neither ratio is canonical; neither is derived from the other. A direct division also avoids the float error a reciprocal round-trip can introduce, which matters here because the tests assert exact ratio values in both frames.
 
-Once the script runs, it will create a cache/ folder in the project folder and download bitcoin_prices.csv and gold_prices.csv into this cache/ folder as a place to store these CSV files for use with the program. 
+`base` enters the analysis functions as a plain string (`"gold"` or `"bitcoin"`), exactly as `holding_period_days` enters as a plain int. `main` translates the CLI argument into that value; the analysis layer never touches `argparse`. The CLI is therefore one caller among several rather than the only one. So a future interactive slider will drive the same neutral core without any change to the analysis code.
 
-### Function by function walkthrough
+There is enough presentation needed around these two assets that it justified a bit of code, namely a dictionary, to manage it. `BASE_PRESENTATION` is a module-level dict holding the facts of each frame, like numerator, denominator, unit label. Each surface composes its own phrasing from those facts, so the chart title, the axis label, and the terminal output cannot disagree about what frame they are in.
 
-##### `fetch_price_data`
+**Forward-fill for gaps.** Gold doesn't trade on weekends; bitcoin does. On top of that, the data provider occasionally drops a day. Both problems are solved the same way, in two stages: reindex to a continuous daily range (which exposes every gap as an explicit empty row), then forward-fill.
 
-Takes the str either `"bitcoin"` or `"gold"` delivered in `main` and produces a pandas DataFrame with index on Date and a price column. I used a dictionary to organize the look up of the respective assets in Yahoo Finance. Uses a CSV cache to handle data freshness (see Design Decisions).
+Forward-fill specifically is used, not interpolation, not backfill. Both of those would use a future price to fill a past gap, which means the window analysis would be reading prices that did not exist yet on the day it claims to be trading. Propagating the last known price is the conservative choice: it can be stale, but it is never clairvoyant.
 
-##### `align_and_compute_ratio`
+The continuous daily index is also a deliberate model of what a holding period *is*. "Hold for 90 days" means 90 wall-clock days, not 90 trading days, and the dense index is the honest representation of that.
 
-Takes the 2 pandas price series indexed on dates, joins them on date, reindexes on a continuous date range, forward-fills gaps (see Design Decisions), drops the earlier rows where bitcoin data doesn't yet exist and outputs the combined DataFrame with both assets and ratio of bitcoin over gold.
+Finally, `dropna(subset=["price_btc"])` trims the leading gold-only history. Yahoo Finance has gold back to 2000 and bitcoin only to 2014; there's no ratio to compute before both exist.
 
-##### `compute_windows`
+**Vectorized windows.** The first version of `compute_windows` looped over `iterrows()`, looking up each exit by date. That was hedging for correctness through a familiar technique and a deliberate choice while learning pandas. It's also the wrong shape for what comes next: an interactive slider recomputes every window on every drag, so the loop becomes visible lag.
 
-Takes the combined DataFrame with prices and ratio and along with the given or default holding_period_days gives a whole new DataFrame with entry/exit date and ratio and whether that change in ratio was profitable or not as a bool. Used a for loop and the handy ability to take a dictionary and turn it into a pandas DataFrame to build the compute windows output DataFrame. See design decisions for an explanation of the `holding_period_days >= (len(ratio_df) - 1)` choice.
+The vectorized form is a single row-shift, `ratio_df["ratio"].shift(-N)`, which aligns each entry with its exit for a per-element comparison. **This is only equivalent to the loop's date-based lookup because the index is dense**. It has one row per calendar day, guaranteed upstream by the reindex + ffill above. That cross-function coupling is the assumption the whole vectorization rests on, and it's noted in the docstring for the next person who touches it.
 
-##### `calculate_success_rate`
+The refactor was done with a characterization-test first: the loop's exact output was captured as ground truth across several holding periods (including ties and boundary values), and the vectorized version had to reproduce it identically before I removed the loop.
 
-This function very simply takes the "profitable" column from the `compute_windows` DataFrame and takes an average of those bools giving the ratio of them that are true. 
+**Segment-based chart coloring.** The commonly known way to get a two-color fill in Plotly is the "NaN trick": two traces, one green and one red, each holding `NaN` wherever the other color applies. It doesn't work with `fill="tozeroy"` and that is a known Plotly.js rendering bug, and the result was the entire area filled brown.
 
-##### `amend_ratio_with_profitability`
+The working approach detects same-color runs with `(profitable != profitable.shift()).cumsum()`, splits the frame on those runs, and adds one filled trace per run. This lives in `generate_chart` rather than being extracted into the analysis layer, because segmenting a series for the renderer's benefit is a rendering concern. It has no analytical meaning.
 
-This function takes our two main DataFrames so far `ratio_df` and `windows_df` and does some trimming to account for the holding period, a reindex and then adds the `"profitable"` column from `windows_df` to `ratio_df` and then returns `ratio_df`.
+**Holding-period guard.** `compute_windows` rejects a holding period of `len(ratio_df) - 1` or greater. That is one day shorter than the arithmetic actually requires for plotly to successfully execute a chart. That looks like an off-by-one. It isn't; it's a UX decision, settled by hand-tracing the output rather than by argument. A holding period one day below the arithmetic limit yields a single surviving window, and a chart of a single point has nothing to show: no change in ratio, no fill, no color. Two points is the minimum that renders as a chart with meaningful information, so two points is the floor the guard enforces.
 
-##### `generate_chart`
+**Caching and freshness.** Price data is cached to CSV, and re-fetched only when the cache is older than `CACHE_MAX_AGE_IN_DAYS`. Yahoo Finance adds one price per day per asset, so hitting the API on every run buys nothing — a cache that's a few days stale gives the same answer to essentially every question this tool is asked. During development the same cache is what makes it possible to iterate without hammering someone else's free service.
 
-The sort of grand finale function takes many of the previous outputs, `ratio_df`, `output_path`, `holding_period_days`, and `success_rate` and uses them to make a chart with plotly.graph_objects. First it segments ratio_df in a way that is particular to how the chart is built. (See design decisions). Then after making the figure it does a color fill for each segment to create the instant visual understanding of the profit and loss chart. Finally finishing out with titles and saving the chart to an HTML in the output path.
+**Why yfinance.** It covers both bitcoin and gold with enough history, and it's free. A paid data source would have made the tool marginally better and dramatically less likely to be run by anyone who isn't me.
 
-##### `main`
+## Known limitations
 
-Orchestrates the flow:
-- Parses the command line arguments
-- Handles the no-argument default
-- Calls the functions in order
-- Prints results
-- Opens the chart
-- Handles errors
+- **History starts in 2014.** Yahoo Finance's bitcoin coverage doesn't go back further, though bitcoin does. How much the missing early years are worth is debatable since bitcoin was in an adoption phase and gold was not, but the gap is real.
+- **Forward-fill is lossy.** Weekend and gap prices are propagated, not observed. Any conclusion drawn at day-to-day resolution should be treated with suspicion, while at the same time that sort of trading analysis is not what this tool was designed for. 
+- **The ratio is synthetic.** It's constructed by dividing two USD-mediated series. Small markets exist trading bitcoin against tokenized gold, but there is no appreciably large native market where bitcoin trades directly against physical spot gold. The ratio is a derived quantity, not an observed price.
+- **A yfinance outage crashes the tool.** Currently the traceback is the error message. Acceptable for a CLI audience; not acceptable once there's a browser in front of it, and it's on the roadmap to fix before then.
+- **The success rate is a frequency, not a probability.** It describes what happened, and is only a useful guide to what will happen insofar as the future resembles the past. That's the tool's entire premise and also its central caveat. _This is not financial advice._
 
-### Design decisions
+## Project layout
 
-**Forward-fill for gaps.** In `align_and_compute_ratio` there were several issues and decisions worked out in development for this function. First, the issue that gold is not traded on the weekend and so has no weekend price data where bitcoin is and does. After considering back fill, back and forward fill and forward fill, this was resolved with `ffill()`. Next, during development it was discovered that occasionally one of the data providers (usually bitcoin) gave data that was missing a day, usually the last or second to last day. This was resolved along with the gold weekend issue together as one with the `ffill()`, first by reindexing to a continuous date range to account for any missing days, and then with forward fill. So why forward fill? The assets data is forward-filled for occasional missing days from the data provider, on the same epistemic-conservatism principle as gold weekend handling: this tool propagates the last known price rather than fabricating or interpolating. And finally, because the bitcoin data only goes back to 2014 with Yahoo Finance and the asset itself only goes back to 2008 or 2009, and the gold data from Yahoo Finance goes back to 2000, this tool needed a practical way to pair that for one-to-one comparison and so the `.dropna()` method cuts off the older unused gold data.
+The pipeline runs **data → analysis → visualization**, with `main` orchestrating from above rather than participating:
 
-**Caching and freshness.** In `fetch_price_data` the cache folder along with the freshness conditional block is for two purposes. First, to reduce hitting the API too frequently during the writing process and secondly, so that once the script is complete and ships it hits the API only as often as needed. That was made easy by creating the CACHE_MAX_AGE_IN_DAYS constant at the top of the script which I mostly kept at 7 days and then reduced to 3 days and then 1 day to ship. The bitcoin_prices.csv and gold_prices.csv from Yahoo Finance only add one price per day and so for the vast majority of use cases a date range that is fresh up to a few days is just as useful as one that hits the API every day or even worse 30 times a day.
+| Stage | Functions |
+|---|---|
+| **data** | `fetch_price_data` |
+| **analysis** | `align_and_compute_ratio` · `compute_windows` · `calculate_success_rate` · `amend_ratio_with_profitability` |
+| **visualization** | `generate_chart` |
 
-**Vectorization vs. loop.** During initial development I used a loop version of `compute_windows` in keeping with my knowledge at the time. But to pave the way for further development it was necessary to vectorize it with `.shift(-N)`. I ensured the loops behavior with a characterization test (hand-traced across holding periods, including ties), then proved the vectorized version byte-identical on the full real dataset before removing the loop. One caveat worth noting: this vectorized computation is
-equivalent to a calendar-day exit lookup only because `ratio_df` has a dense daily index (one row per calendar day, guaranteed upstream by `align_and_compute_ratio`'s reindex+ffill).
+The analysis functions are pure, which is why they're the ones under test. `fetch_price_data` (network + filesystem) and `generate_chart` (writes a file) are side-effect machines and are covered only at their error boundaries. `test_project.py` holds 18 tests; run them with `pytest`.
 
-**yfinance.** I used yfinance for this project because it offered a decently thorough data set for both bitcoin and gold that was free, making the tool more widely available to anyone who may use it.
+## Roadmap
 
-**Holding-period guard.** The decision for the `holding_period_days >= (len(ratio_df) - 1)` choice was ultimately a user interface decision. The filter will allow only `holding_period_days` of `len(ratio_df) - 2` or less. The choice may at first seem odd or even an error in judgment since a window removed ratio_df needs only one day remaining to technically pass without a `ValueError`. However, when the chart is produced it needs to contain at least two days to meaningfully display the change of ratio and color fill. 
+- **Interactive holding-period slider** — drag the period, watch the chart and success rate recompute live. The vectorization above is what makes this feasible.
+- **Supply-adjusted mode** — separate capital rotation from supply-growth effects, distinguishing nominal from constant-supply framing. Bundled with FRED integration as a second data source.
+- **Web deployment** — the next goal. A tool that requires you to clone a repo and stand up a virtualenv is a tool for people who already know how to do that, which is great if that's you. However, further development will open the tool up to a much wider audience. 
+- **CI** — run the test suite on push. (Also: earns an honest build badge, which the ones above currently are not a substitute for.)
 
-**Segment-based chart coloring.** In `generate_chart` the original plan was to use a `where()` based NaN masking approach (one green trace, one red trace, each with `NaN` where the other color applies) that I found that is sometimes called the "NaN trick" that would work for `fill="tozeroy"`. This did not work and is a known and documented Plotly.js rendering bug. It was filling the entire area with brown instead of red and green segments. So instead I searched and found this technique: break the DataFrame into segments and then detect same-color runs with `(profitable != profitable.shift()).cumsum()`, then add one filled go.Scatter trace per segment.
+## License
 
-### Known limitations
-
-- Data only goes back to September 2014 due to Yahoo Finance's coverage, but Bitcoin's history goes all the way back to 2008/2009 so we are missing some data that some may find relevant. The value of this early data to the tool is debatable since Bitcoin was in an early adoption phase and gold wasn't.
-- Occasional missing days handled by forward-fill. This inherently is data lossy and reduces validity of the information the tool can give when it is used at the day to day level.
-- The bitcoin over gold ratio is constructed by dividing two USD-mediated series. Small direct markets exist trading bitcoin to tokenized gold, but there is no appreciably large native market where bitcoin trades directly against physical spot gold. 
-- The tool depends on yfinance so transient outages would cause the program to fail with an API error.
-- As discussed in "Interpreting the results" the percentage given as "Historical Success Rate" is only a loose proxy for the future probability of profitability. That predictive value for decision making is the purpose of the tool but is conditional on the future resembling the past. (_This is not financial advice._)
+MIT (see [LICENSE](LICENSE)).

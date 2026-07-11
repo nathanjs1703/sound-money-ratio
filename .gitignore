@@ -13,3 +13,9 @@ btc-gold-chart.html
 # OS / editor cruft
 .DS_Store
 *.swp
+
+# Test / tooling caches
+.pytest_cache/
+.mypy_cache/
+
+.vscode/
