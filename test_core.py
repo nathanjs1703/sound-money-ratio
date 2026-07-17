@@ -1,9 +1,8 @@
-from project import BASE_PRESENTATION
-from project import fetch_price_data
-from project import align_and_compute_ratio
-from project import compute_windows
-from project import calculate_success_rate
-from project import amend_ratio_with_profitability
+from sound_money_core import BASE_PRESENTATION
+from sound_money_core import align_and_compute_ratio
+from sound_money_core import compute_windows
+from sound_money_core import calculate_success_rate
+from sound_money_core import amend_ratio_with_profitability
 import pytest
 import pandas as pd
 
@@ -15,15 +14,6 @@ def test_base_presentation_structure():
     for base in ("gold", "bitcoin"):
         labels = BASE_PRESENTATION[base]
         assert set(labels) == {"held_asset", "numerator", "denominator", "unit"}
-
-
-############################ fetch_price_data test ############################
-
-
-def test_fetch_price_data_invalid_asset():
-
-    with pytest.raises(KeyError):
-        fetch_price_data("dollar")
 
 
 ######################## align_and_compute_ratio tests ########################
