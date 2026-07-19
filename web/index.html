@@ -1,0 +1,333 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Sound Money Ratio</title>
+  <script src="https://cdn.plot.ly/plotly-2.35.2.min.js"></script>
+  <script src="core.js"></script>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto,
+                   Helvetica, Arial, sans-serif;
+      color: #1a1a1a;
+      background: #fafafa;
+      padding: 2rem 1rem;
+    }
+
+    .container {
+      max-width: 960px;
+      margin: 0 auto;
+    }
+
+    header { margin-bottom: 1.5rem; }
+
+    h1 {
+      font-size: 1.5rem;
+      font-weight: 600;
+      margin-bottom: 0.35rem;
+    }
+
+    .tagline {
+      color: #555;
+      font-size: 0.9rem;
+      line-height: 1.5;
+      max-width: 640px;
+    }
+
+    /* --- controls row --- */
+
+    .controls {
+      display: flex;
+      align-items: flex-end;
+      gap: 1.25rem;
+      flex-wrap: wrap;
+      margin-bottom: 1.25rem;
+    }
+
+    .control-group label {
+      display: block;
+      font-size: 0.8rem;
+      font-weight: 500;
+      margin-bottom: 0.35rem;
+      color: #444;
+    }
+
+    #holding-period {
+      width: 6.5rem;
+      padding: 0.45rem 0.6rem;
+      font-size: 0.95rem;
+      border: 1px solid #bbb;
+      border-radius: 4px;
+      background: #fff;
+    }
+
+    .base-toggle {
+      display: inline-flex;
+      border: 1px solid #bbb;
+      border-radius: 4px;
+      overflow: hidden;
+    }
+
+    .base-toggle button {
+      padding: 0.45rem 1.1rem;
+      font-size: 0.95rem;
+      border: none;
+      background: #fff;
+      cursor: pointer;
+      color: #444;
+    }
+
+    .base-toggle button.active {
+      background: #1a1a1a;
+      color: #fff;
+    }
+
+    .base-toggle button + button {
+      border-left: 1px solid #bbb;
+    }
+
+    #analyze-btn {
+      padding: 0.45rem 1.25rem;
+      font-size: 0.95rem;
+      font-weight: 500;
+      border: none;
+      border-radius: 4px;
+      background: #1a1a1a;
+      color: #fff;
+      cursor: pointer;
+    }
+
+    #analyze-btn:hover { background: #333; }
+
+    /* --- result sentence --- */
+
+    #result-sentence {
+      font-size: 1.05rem;
+      line-height: 1.6;
+      margin-bottom: 0.75rem;
+      min-height: 1.6em;
+    }
+
+    /* --- chart --- */
+
+    #chart {
+      width: 100%;
+      min-height: 450px;
+    }
+
+    /* --- status / error --- */
+
+    .status {
+      color: #888;
+      font-size: 0.95rem;
+      padding: 4rem 0;
+      text-align: center;
+    }
+
+    .error-msg {
+      color: #c0392b;
+      font-size: 0.9rem;
+      margin-bottom: 0.75rem;
+    }
+
+    /* --- footer --- */
+
+    footer {
+      margin-top: 2rem;
+      padding-top: 1rem;
+      border-top: 1px solid #ddd;
+      font-size: 0.8rem;
+      color: #888;
+    }
+
+    footer a { color: #555; }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <header>
+      <h1>Sound Money Ratio</h1>
+      <p class="tagline">
+        How often has holding bitcoin beaten gold, or gold beaten bitcoin,
+        over any period in their shared history? Pick a holding period and
+        find out.
+      </p>
+    </header>
+
+    <main>
+      <div class="controls">
+        <div class="control-group">
+          <label for="holding-period">Holding period (days)</label>
+          <input type="number" id="holding-period" value="180" min="1">
+        </div>
+        <div class="control-group">
+          <label>Base asset</label>
+          <div class="base-toggle">
+            <button class="active" data-base="gold">Gold</button>
+            <button data-base="bitcoin">Bitcoin</button>
+          </div>
+        </div>
+        <button id="analyze-btn">Analyze</button>
+      </div>
+
+      <div id="error-area"></div>
+      <p id="result-sentence"></p>
+      <div id="chart"><p class="status">Loading price data...</p></div>
+    </main>
+
+    <footer>
+      <a href="https://github.com/nathanjs1703/sound-money-ratio">Source on GitHub</a>.
+      Data from Yahoo Finance via yfinance. This is a historical frequency,
+      not financial advice.
+    </footer>
+  </div>
+
+<script>
+(function () {
+  "use strict";
+
+  // mirrors sound_money_core.py's BASE_PRESENTATION
+  var BASE_PRESENTATION = {
+    gold: {
+      held_asset: "bitcoin",
+      numerator: "BTC",
+      denominator: "Gold",
+      unit: "oz gold per BTC"
+    },
+    bitcoin: {
+      held_asset: "gold",
+      numerator: "Gold",
+      denominator: "BTC",
+      unit: "BTC per oz gold"
+    }
+  };
+
+  // --- state ---
+  var priceData = null;  // loaded from data.json
+  var currentBase = "gold";
+
+  // --- DOM refs ---
+  var periodInput = document.getElementById("holding-period");
+  var analyzeBtn = document.getElementById("analyze-btn");
+  var sentenceEl = document.getElementById("result-sentence");
+  var chartEl = document.getElementById("chart");
+  var errorArea = document.getElementById("error-area");
+  var toggleBtns = document.querySelectorAll(".base-toggle button");
+
+  // --- load data ---
+  fetch("data.json")
+    .then(function (res) {
+      if (!res.ok) throw new Error("Could not load price data.");
+      return res.json();
+    })
+    .then(function (data) {
+      priceData = data;
+      render();
+    })
+    .catch(function (err) {
+      chartEl.innerHTML =
+        '<p class="status">Failed to load price data. ' +
+        "Try refreshing the page.</p>";
+      console.error(err);
+    });
+
+  // --- event handlers ---
+  analyzeBtn.addEventListener("click", render);
+
+  periodInput.addEventListener("keydown", function (e) {
+    if (e.key === "Enter") render();
+  });
+
+  for (var i = 0; i < toggleBtns.length; i++) {
+    toggleBtns[i].addEventListener("click", function () {
+      for (var j = 0; j < toggleBtns.length; j++) {
+        toggleBtns[j].classList.remove("active");
+      }
+      this.classList.add("active");
+      currentBase = this.getAttribute("data-base");
+      render();
+    });
+  }
+
+  // --- render ---
+  function render() {
+    if (!priceData) return;
+
+    errorArea.innerHTML = "";
+
+    var period = parseInt(periodInput.value, 10);
+    var maxPeriod = priceData.dates.length - 2;
+
+    // validate
+    if (isNaN(period) || period <= 0) {
+      showError("Holding period must be a positive whole number.");
+      return;
+    }
+    if (period > maxPeriod) {
+      showError(
+        "Holding period must be less than " + (maxPeriod + 1) +
+        " days (the length of the available history)."
+      );
+      return;
+    }
+
+    // compute
+    var ratio = computeRatio(priceData.price_btc, priceData.price_gold, currentBase);
+    var profitable = computeWindows(ratio, period);
+    var rate = calculateSuccessRate(profitable);
+
+    // trim dates and ratio to valid window entries
+    var trimmedDates = priceData.dates.slice(0, profitable.length);
+    var trimmedRatio = ratio.slice(0, profitable.length);
+
+    // sentence (matches CLI output)
+    var labels = BASE_PRESENTATION[currentBase];
+    var pct = (rate * 100).toFixed(1) + "%";
+    sentenceEl.textContent =
+      "Holding " + labels.held_asset + " for " + period +
+      " days was profitable in " + currentBase + " in " + pct +
+      " of historical windows.";
+
+    // chart
+    var segments = computeSegments(trimmedDates, trimmedRatio, profitable);
+    var traces = [];
+    for (var s = 0; s < segments.length; s++) {
+      var seg = segments[s];
+      var color = seg.profitable
+        ? "rgba(0, 255, 0, 0.5)"
+        : "rgba(255, 0, 0, 0.5)";
+      traces.push({
+        x: seg.dates,
+        y: seg.ratios,
+        mode: "lines",
+        fill: "tozeroy",
+        fillcolor: color,
+        line: { color: color },
+        showlegend: false
+      });
+    }
+
+    var ratioName = labels.numerator + "/" + labels.denominator;
+    var layout = {
+      title:
+        ratioName + " Ratio \u2014 Holding Period: " + period +
+        " days, Historical Success Rate: " + pct,
+      xaxis: { title: "Date" },
+      yaxis: { title: ratioName + " Ratio (" + labels.unit + ")" },
+      margin: { t: 60, r: 30, b: 50, l: 70 }
+    };
+
+    Plotly.newPlot(chartEl, traces, layout, { responsive: true });
+  }
+
+  function showError(msg) {
+    errorArea.innerHTML = '<p class="error-msg">' + msg + "</p>";
+    sentenceEl.textContent = "";
+  }
+})();
+</script>
+</body>
+</html>
