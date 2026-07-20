@@ -19,3 +19,8 @@ btc-gold-chart.html
 .mypy_cache/
 
 .vscode/
+
+#web app
+web/data.json
+web/fixtures.json
+EOF

@@ -1,41 +1,19 @@
-# Sound Money Ratio — command-line application
+# Sound Money Ratio — web application
 
-The command-line application for the Sound Money Ratio project. See the [project README](../README.md) for the thesis and the other applications.
+The web application for the Sound Money Ratio project. See the [project README](../README.md) for the thesis and the other applications.
+
+**Live at [nathanjs1703.github.io/sound-money-ratio](https://nathanjs1703.github.io/sound-money-ratio/).**
 
 | Short holds | Long holds |
 |:---:|:---:|
 | ![BTC/Gold ratio, 30-day hold — green and red windows in roughly even stripes](../assets/chart-30d.png) | ![BTC/Gold ratio, 752-day hold — mostly green with occasional red bands](../assets/chart-752d.png) |
 | Gold base, 30-day hold · as of 2026-07-14 · near even | Gold base, 752-day hold · as of 2026-07-14 · 75.2% of windows profitable |
 
-## Quickstart
+## How it works
 
-```bash
-git clone https://github.com/nathanjs1703/sound-money-ratio.git
-cd sound-money-ratio
-python3 -m venv .venv && source .venv/bin/activate
-pip install -r requirements.txt
+Enter a holding period in days, select a base asset (gold or bitcoin), and hit Analyze. The tool returns a chart and a plain-language sentence telling you how often that trade was profitable across the full shared history of bitcoin and gold.
 
-python3 cli/project.py --base gold 180
-```
-
-```
-Holding bitcoin for 180 days was profitable in gold in XX.X% of historical windows.
-
-Chart saved to btc-gold-chart.html
-```
-
-The chart opens in your browser automatically and is saved to the directory from which the tool was run.
-
-**Arguments.** `--base` is the asset you start and end in (`gold` or `bitcoin`); the positional argument is the holding period in days. Both are optional. The tool defaults to gold and 180 days, and tells you when it does.
-
-```bash
-python3 cli/project.py                      # gold base, 180 days
-python3 cli/project.py --base bitcoin 90    # bitcoin base, 90 days
-```
-
-**First run** downloads price history from Yahoo Finance into a `cache/` folder (you'll see yfinance's progress bars). Subsequent runs reuse the cache until it goes stale.
-
-**Tests:** `pytest` from the project root.
+The tool accepts any integer holding period from 1 to the length of the available price history. Both base assets are available. The chart and sentence update on each analysis.
 
 ## Reading the chart
 
@@ -51,14 +29,13 @@ The success rate is a historical frequency, not an infallible forecast. See [Kno
 
 ### Core
 
-**Monorepo split.** This project has one analytical core and two applications (a CLI and a web app) that present the same analysis to different audiences. They live in a single repository rather than being split into separate packages, because the shared core is a single Python module and the overhead of packaging it would add complexity without solving a problem the project actually has. Each application is a thin caller: neither modifies the core's behavior, and both produce identical analytical results. The directory structure follows from this: the core sits at the repo root, each application has its own subdirectory (`cli/`, `web/`), and each carries its own README documenting application-specific concerns. Design decisions and known limitations that belong to the core are duplicated in both application READMEs so that each stands alone without cross-references.
-
+**Monorepo split.** This project has one analytical core and two applications (a CLI and a web app) that present the same analysis to different audiences. They live in a single repository rather than being split into separate packages, because the shared core is a single Python module (`sound_money_core.py`) small enough that packaging overhead would exceed the code itself. Each application is a thin caller: neither modifies the core's behavior, and both produce identical analytical results. The directory structure follows from this: the core sits at the repo root, each application has its own subdirectory (`cli/`, `web/`), and each carries its own README documenting application-specific concerns. Design decisions and known limitations that belong to the core are duplicated in both application READMEs so that each stands alone without cross-references.
 
 **Base asset neutrality.** The original version hardcoded a hidden premise: _gold is home_. You started in gold, bought bitcoin, sold back to gold, and "profitable" meant ending with more gold. The bias was mostly in the _direction of the question_, not the code. The tool hid the mirror question: was holding gold good for a bitcoin-owner?
 
 Rather than compute the original BTC/Gold and then invert it for the bitcoin case, the chosen base selects the numerator and denominator at construction inside `align_and_compute_ratio`, either `price_btc / price_gold` or `price_gold / price_btc`, both built directly from each dollar-denominated price series. Neither ratio is canonical; neither is derived from the other. A direct division also avoids the float error a reciprocal round-trip can introduce, which matters here because the tests assert exact ratio values in both frames.
 
-`base` enters the analysis functions as a plain string (`"gold"` or `"bitcoin"`), exactly as `holding_period_days` enters as a plain int. Each application translates its own input into that value; the analysis layer never touches CLI argument parsing or browser rendering. Each application is therefore a thin caller operating on the shared core, importing it with no modification.
+`base` enters the analysis functions as a plain string (`"gold"` or `"bitcoin"`), exactly as `holding_period_days` enters as a plain int. Each application translates its own input into that value; the analysis layer never touches `argparse` or the DOM. Each application is therefore a thin caller operating on the shared core, importing it with no modification.
 
 There is enough presentation needed around these two assets that it justified a bit of code, namely a dictionary, to manage it. `BASE_PRESENTATION` is a module-level dict holding the facts of each frame, like numerator, denominator, unit label. Each surface composes its own phrasing from those facts, so the chart title, the axis label, and the terminal output cannot disagree about what frame they are in.
 
@@ -84,9 +61,15 @@ The working approach detects same-color runs with `(profitable != profitable.shi
 
 **Why yfinance.** It covers both bitcoin and gold with enough history, and it's free. A paid data source would have made the tool marginally better and dramatically less likely to be run by anyone who isn't me.
 
-### Command-line
+### Web app
 
-**Caching and freshness.** Price data is cached to CSV, and re-fetched only when the cache is older than `CACHE_MAX_AGE_IN_DAYS`. Yahoo Finance adds one price per day per asset, so hitting the API on every run buys nothing — a cache that's a few days stale gives the same answer to essentially every question this tool is asked. During development the same cache is what makes it possible to iterate without hammering someone else's free service.
+**Static deploy and the publish-time boundary.** The web app is a static site hosted on GitHub Pages. There is no backend server — no process listening for requests, no cold starts, no hosting bill, no backend server to maintain or keep alive. This is a deliberate choice driven by the project's primary UX goal: a URL that works instantly for anyone, anytime.
+
+The architecture has two halves: a publish pipeline that runs in CI, and a browser-side analytical core that runs on the visitor's machine. The boundary between them sits at alignment. A GitHub Action runs daily, fetches fresh prices via yfinance, runs the shared Python core's alignment logic (`align_and_compute_ratio` from `sound_money_core.py`, imported directly with no modification), and writes a `data.json` file containing the dense, forward-filled daily price series. All the epistemically loaded work — the outer join, the reindex to a continuous daily range, the forward-fill, the leading-NaN trim — stays in Python, runs once at publish time, and ships as already-clean data. The result is deployed to GitHub Pages as a static file alongside the page.
+
+When a visitor submits a holding period and base, four JavaScript functions in `core.js` compute the ratio, classify windows, calculate the success rate, and detect chart segments — mirroring only the downstream arithmetic from `sound_money_core.py`. The chart is rendered by Plotly.js, the same engine the CLI's HTML output uses.
+
+**JS mirror and parity testing.** The browser-side compute means four analytical functions exist in both Python and JavaScript. This is a real duplication cost, accepted because the alternative (a backend server) directly conflicts with the zero-friction static hosting goal. The defense is cross-language characterization testing: the publish pipeline emits a `fixtures.json` file containing Python-computed success rates at a spread of holding periods and both bases, and `test_parity.js` runs in CI before every deploy, asserting that the JS functions reproduce them exactly. If the mirror ever drifts from the Python core, the deploy fails and the site does not update.
 
 ## Known limitations
 
@@ -98,9 +81,11 @@ The working approach detects same-color runs with `(profitable != profitable.shi
 - **Supply adjustment was measured and deliberately not implemented.** Bitcoin and gold both dilute, at different rates, so a constant-supply framing would tilt the ratio slightly. That tilt was measured against the real price history across holding periods and both bases before deciding: the largest movement in the success rate anywhere was 1.1 percentage points, well inside the tool's existing noise. Because gold dilutes faster than bitcoin, the correction runs in one direction, meaning the raw ratio very slightly understates bitcoin's performance on a scarce-versus-scarce basis at long holds. The feature was dropped rather than built because the effect does not meaningfully change any answer the tool gives.
 - **The success rate is a frequency, not a probability.** It describes what happened, and is only a useful guide to what will happen insofar as the future resembles the past. That's the tool's entire premise and also its central caveat. _This is not financial advice._
 
-### Command-line
+### Web app
 
-- **A yfinance outage crashes the tool.** Currently the traceback is the error message. Acceptable for a CLI audience. The web app avoids this entirely: prices are fetched at publish time by a GitHub Action, so a yfinance outage delays the daily data refresh but never crashes the page.
+- **Data freshness is daily, not live.** The GitHub Action runs once per day. A visitor sees whatever the most recent run produced, not a live fetch. For a historical-frequency tool this is more than adequate, but the price history will always be at most one day behind.
+- **The JS mirror is a maintenance obligation.** Any future change to the Python core's arithmetic must be made in `core.js` as well. The parity test catches drift but does not eliminate the double work.
+- **No offline support.** The page fetches `data.json` on every load. If GitHub Pages is unreachable, the page shows a loading error.
 
 ## Project layout
 
@@ -114,21 +99,21 @@ sound-money-ratio/
 ├── cli/
 │   ├── project.py        data fetching, chart rendering, CLI entry point
 │   ├── test_cli.py       tests for the CLI
-│   └── README.md         this file
+│   └── README.md         CLI usage and design decisions
 └── web/
     ├── index.html        page: controls, chart, sentence, explanatory text
     ├── core.js           JS analytical mirror (four functions)
     ├── publish.py        CI: generates data.json and fixtures.json
     ├── test_parity.js    CI: deploy-gate parity test
-    └── README.md         web app architecture and design decisions
+    └── README.md         this file
 ```
 
-The CLI pipeline runs **data → analysis → visualization**, with `main` orchestrating from above rather than participating:
+`data.json` and `fixtures.json` are generated artifacts, not committed. The GitHub Action creates them fresh each run.
 
-| Stage | Location | Functions |
+The web app pipeline:
+
+| Stage | Where it runs | What it does |
 |---|---|---|
-| **data** | `cli/project.py` | `fetch_price_data` |
-| **analysis** | `sound_money_core.py` | `align_and_compute_ratio` · `compute_windows` · `calculate_success_rate` · `amend_ratio_with_profitability` |
-| **visualization** | `cli/project.py` | `generate_chart` |
-
-The analysis functions are pure, which is why they're the ones under test and why they're the ones that live in the shared core. `fetch_price_data` (network + filesystem) and `generate_chart` (writes a file) are side-effect machines and are covered only at their error boundaries. Run the suite with `pytest` from the project root.
+| **fetch + align** | CI (`publish.py`) | yfinance download, `align_and_compute_ratio`, write `data.json` |
+| **parity gate** | CI (`test_parity.js`) | assert JS core matches Python-computed fixtures |
+| **compute + render** | browser (`core.js` + `index.html`) | ratio, windows, success rate, Plotly chart |

@@ -4,6 +4,15 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Sound Money Ratio</title>
+  <link rel="icon" type="image/svg+xml" href="favicon.svg">
+
+  <!-- link preview -->
+  <meta property="og:title" content="Sound Money Ratio">
+  <meta property="og:description" content="How often has holding bitcoin beaten gold, or gold beaten bitcoin, over any period in their shared history? Pick a holding period, select Bitcoin or Gold and hit Analyze to find out.">
+  <meta property="og:image" content="https://raw.githubusercontent.com/nathanjs1703/sound-money-ratio/main/assets/chart-30d.png">
+  <meta property="og:url" content="https://nathanjs1703.github.io/sound-money-ratio/">
+  <meta property="og:type" content="website">
+  <meta name="twitter:card" content="summary_large_image">
   <script src="https://cdn.plot.ly/plotly-2.35.2.min.js"></script>
   <script src="core.js"></script>
   <style>
@@ -24,17 +33,28 @@
 
     header { margin-bottom: 1.5rem; }
 
+    .title-row {
+      display: flex;
+      align-items: center;
+      gap: 0.6rem;
+      margin-bottom: 0.35rem;
+    }
+
+    .logo-mark {
+      width: 2rem;
+      height: 2rem;
+      flex-shrink: 0;
+    }
+
     h1 {
       font-size: 1.5rem;
       font-weight: 600;
-      margin-bottom: 0.35rem;
     }
 
     .tagline {
       color: #555;
       font-size: 0.9rem;
       line-height: 1.5;
-      max-width: 640px;
     }
 
     /* --- controls row --- */
@@ -133,6 +153,46 @@
       margin-bottom: 0.75rem;
     }
 
+    /* --- explanatory sections --- */
+
+    .explanation {
+      margin-top: 2rem;
+    }
+
+    .explanation h2 {
+      font-size: 1.1rem;
+      font-weight: 600;
+      margin-bottom: 0.5rem;
+    }
+
+    .explanation p {
+      font-size: 0.9rem;
+      line-height: 1.6;
+      color: #333;
+      margin-bottom: 0.75rem;
+    }
+
+    .explanation a {
+      color: #555;
+    }
+
+    .project-links {
+      list-style: none;
+      padding: 0;
+    }
+
+    .project-links li {
+      font-size: 0.9rem;
+      line-height: 1.6;
+      color: #333;
+      padding: 0.2rem 0;
+    }
+
+    .project-links li::before {
+      content: "→ ";
+      color: #888;
+    }
+
     /* --- footer --- */
 
     footer {
@@ -149,11 +209,19 @@
 <body>
   <div class="container">
     <header>
-      <h1>Sound Money Ratio</h1>
+      <div class="title-row">
+        <svg class="logo-mark" viewBox="0 0 32 32" xmlns="http://www.w3.org/2000/svg">
+          <rect width="32" height="32" rx="6" fill="#1a1a1a"/>
+          <text x="16" y="13" text-anchor="middle" font-family="-apple-system,BlinkMacSystemFont,Segoe UI,Roboto,sans-serif" font-weight="700" font-size="13" fill="#fff">₿</text>
+          <line x1="6" y1="17" x2="26" y2="17" stroke="#888" stroke-width="1"/>
+          <text x="16" y="28" text-anchor="middle" font-family="-apple-system,BlinkMacSystemFont,Segoe UI,Roboto,sans-serif" font-weight="600" font-size="11" fill="#fff">Au</text>
+        </svg>
+        <h1>Sound Money Ratio</h1>
+      </div>
       <p class="tagline">
         How often has holding bitcoin beaten gold, or gold beaten bitcoin,
-        over any period in their shared history? Pick a holding period and
-        find out.
+        over any period in their shared history? Pick a holding period,
+        select Bitcoin or Gold and hit Analyze to find out.
       </p>
     </header>
 
@@ -161,7 +229,7 @@
       <div class="controls">
         <div class="control-group">
           <label for="holding-period">Holding period (days)</label>
-          <input type="number" id="holding-period" value="180" min="1">
+          <input type="number" id="holding-period" value="180" min="1" step="1">
         </div>
         <div class="control-group">
           <label>Base asset</label>
@@ -178,8 +246,60 @@
       <div id="chart"><p class="status">Loading price data...</p></div>
     </main>
 
+    <section class="explanation">
+      <h2>What this answers</h2>
+      <p>
+        If you own bitcoin or gold and are considering trading into the other
+        asset and holding for a while, what are the chances you end up with
+        more than what you started with?
+      </p>
+      <p>
+        The future is opaque, but the past is not. For every day in the price
+        history where someone could have made that trade, this tool checks
+        whether holding for your chosen period would have left them ahead or
+        behind. The share of windows that came out ahead is the answer the
+        tool gives you.
+      </p>
+      <p>
+        Most bitcoin and gold analysis is denominated in dollars. However,
+        with constant historical debasement distorting the real economic
+        signal I feel it is more instructive to see the direct relationship.
+        Measuring the two hard monetary assets directly against each other
+        helps remove some of that distortion. Thus the non-dollar framing and
+        the symmetry between bitcoin and gold are both intentional design
+        philosophies. See the
+        <a href="https://github.com/nathanjs1703/sound-money-ratio/blob/main/README.md">project README</a>
+        for more details.
+      </p>
+    </section>
+
+    <section class="explanation">
+      <h2>Reading the chart</h2>
+      <p>
+        The chart plots the full ratio history &mdash; from the earliest date
+        bitcoin price data exists (around 2014) to the most recent data
+        available, minus the holding period at the tail.
+      </p>
+      <p>
+        Each point on the line is an entry date. The area beneath it is green
+        if a window opening on that date closed profitably, and red if it did
+        not. The Historical Success Rate is simply the green share. See the
+        <a href="https://github.com/nathanjs1703/sound-money-ratio/blob/main/web/README.md">Web App README</a>
+        for more details.
+      </p>
+    </section>
+
+    <section class="explanation">
+      <h2>About the project</h2>
+      <ul class="project-links">
+        <li><a href="https://github.com/nathanjs1703/sound-money-ratio/blob/main/README.md">The project README</a> (start here)</li>
+        <li><a href="https://github.com/nathanjs1703/sound-money-ratio/blob/main/web/README.md">The web app README</a></li>
+        <li><a href="https://github.com/nathanjs1703/sound-money-ratio/blob/main/cli/README.md">The command-line application README</a></li>
+        <li><a href="https://github.com/nathanjs1703/sound-money-ratio">The repo on GitHub</a></li>
+      </ul>
+    </section>
+
     <footer>
-      <a href="https://github.com/nathanjs1703/sound-money-ratio">Source on GitHub</a>.
       Data from Yahoo Finance via yfinance. This is a historical frequency,
       not financial advice.
     </footer>

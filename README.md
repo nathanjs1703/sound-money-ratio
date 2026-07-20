@@ -18,17 +18,17 @@ If you own bitcoin or gold and are considering trading into the other asset and 
 
 The future is opaque, but the past is not. For every day in the price history where someone could have made that trade, this tool checks whether holding for your chosen period would have left them ahead or behind. The share of windows that came out ahead is the answer the tool gives you.
 
-Most bitcoin and gold analysis is denominated in dollars. However, with constant historical debasement distorting the real economic signal I feel it is more instructive to see the direct relationship. Measuring the two hard monetary assets directly against each other removes that distortion. Thus the non-dollar framing and the symmetry between bitcoin and gold are both intentional design philosophies.
+Most bitcoin and gold analysis is denominated in dollars. However, with constant historical debasement distorting the real economic signal I feel it is more instructive to see the direct relationship. Measuring the two hard monetary assets directly against each other helps remove some of that distortion. Thus the non-dollar framing and the symmetry between bitcoin and gold are both intentional design philosophies.
 
 ## Two applications
 
-This project has two applications for two different audiences. 
+This project has two applications for two different audiences.
 
-**[Command-line tool](cli/README.md)** (available now). For people comfortable cloning a repo and running Python locally.
+**[Web app](https://nathanjs1703.github.io/sound-money-ratio/)** — for anyone. Enter a holding period, pick a base asset, and get the answer in your browser. No install, no setup. See the [web app README](web/README.md) for architecture and design decisions.
 
-**Web app** (in development). For people who want a URL rather than a terminal.
+**[Command-line tool](cli/README.md)** — for people comfortable cloning a repo and running Python locally. See the [CLI README](cli/README.md) for installation, usage, design decisions, and known limitations.
 
-See the [CLI README](cli/README.md) for installation, usage, design decisions, and known limitations.
+Both applications share a single analytical core (`sound_money_core.py`) and produce identical results.
 
 ## License
 

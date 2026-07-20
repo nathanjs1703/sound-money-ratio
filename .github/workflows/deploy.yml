@@ -51,6 +51,7 @@ jobs:
           cp web/index.html _site/
           cp web/core.js _site/
           cp web/data.json _site/
+          cp web/favicon.svg _site/
 
       - name: Configure Pages
         uses: actions/configure-pages@v5
