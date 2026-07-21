@@ -3,6 +3,7 @@
 ![Python](https://img.shields.io/badge/python-3.14-blue)
 ![License](https://img.shields.io/badge/license-MIT-green)
 ![Code style](https://img.shields.io/badge/code%20style-black-000000)
+![Tests](https://github.com/nathanjs1703/sound-money-ratio/actions/workflows/test.yml/badge.svg)
 
 The proportion of all possible holding periods in which bitcoin has outperformed gold, or gold bitcoin, across their full shared history.
 
