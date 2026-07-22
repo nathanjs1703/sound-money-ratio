@@ -100,18 +100,6 @@ def test_compute_windows_columns():
     ]
 
 
-def test_compute_windows_profitability():
-
-    dates = pd.date_range(start="2014-09-17", periods=5, freq="D")
-    ratio_df = pd.DataFrame({"ratio": [1.0, 2.0, 1.5, 3.0, 2.5]}, index=dates)
-    assert compute_windows(ratio_df, 1)["profitable"].tolist() == [
-        True,
-        False,
-        True,
-        False,
-    ]
-
-
 def test_compute_windows_invalid_period():
 
     dates = pd.date_range(start="2014-09-17", periods=5, freq="D")

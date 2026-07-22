@@ -8,11 +8,28 @@
  * trim -- never leaves Python).
  *
  * What lives here is only the downstream arithmetic: ratio construction,
- * shift-comparison for windows, mean for success rate, and segment
- * detection for chart coloring. Parity with the Python core is verified
+ * shift-comparison for windows, mean for success rate, segment
+ * detection for chart coloring and presentation facts. Parity with the Python core is verified
  * by test_parity.js before every deploy.
  */
-
+/**
+ * Presentation facts per base frame.
+ * Mirrors sound_money_core.py's BASE_PRESENTATION.
+ */
+var BASE_PRESENTATION = {
+  gold: {
+    held_asset: "bitcoin",
+    numerator: "BTC",
+    denominator: "Gold",
+    unit: "oz gold per BTC"
+  },
+  bitcoin: {
+    held_asset: "gold",
+    numerator: "Gold",
+    denominator: "BTC",
+    unit: "BTC per oz gold"
+  }
+};
 /**
  * Compute the ratio in the chosen base's direction.
  * Mirrors align_and_compute_ratio's final ratio assignment.
@@ -103,5 +120,6 @@ if (typeof module !== "undefined" && module.exports) {
     computeWindows,
     calculateSuccessRate,
     computeSegments,
+    BASE_PRESENTATION,
   };
 }

@@ -67,7 +67,8 @@
       margin-bottom: 1.25rem;
     }
 
-    .control-group label {
+    .control-group label,
+    .control-group .control-label {
       display: block;
       font-size: 0.8rem;
       font-weight: 500;
@@ -232,10 +233,10 @@
           <input type="number" id="holding-period" value="180" min="1" step="1">
         </div>
         <div class="control-group">
-          <label>Base asset</label>
-          <div class="base-toggle">
-            <button class="active" data-base="gold">Gold</button>
-            <button data-base="bitcoin">Bitcoin</button>
+          <span class="control-label" id="base-label">Base asset</span>
+          <div class="base-toggle" role="group" aria-labelledby="base-label">
+            <button class="active" data-base="gold" aria-pressed="true">Gold</button>
+            <button data-base="bitcoin" aria-pressed="false">Bitcoin</button>
           </div>
         </div>
         <button id="analyze-btn">Analyze</button>
@@ -309,22 +310,6 @@
 (function () {
   "use strict";
 
-  // mirrors sound_money_core.py's BASE_PRESENTATION
-  var BASE_PRESENTATION = {
-    gold: {
-      held_asset: "bitcoin",
-      numerator: "BTC",
-      denominator: "Gold",
-      unit: "oz gold per BTC"
-    },
-    bitcoin: {
-      held_asset: "gold",
-      numerator: "Gold",
-      denominator: "BTC",
-      unit: "BTC per oz gold"
-    }
-  };
-
   // --- state ---
   var priceData = null;  // loaded from data.json
   var currentBase = "gold";
@@ -365,8 +350,10 @@
     toggleBtns[i].addEventListener("click", function () {
       for (var j = 0; j < toggleBtns.length; j++) {
         toggleBtns[j].classList.remove("active");
+        toggleBtns[j].setAttribute("aria-pressed", "false");
       }
       this.classList.add("active");
+      this.setAttribute("aria-pressed", "true");
       currentBase = this.getAttribute("data-base");
       render();
     });
@@ -378,11 +365,11 @@
 
     errorArea.innerHTML = "";
 
-    var period = parseInt(periodInput.value, 10);
+    var period = Number(periodInput.value);
     var maxPeriod = priceData.dates.length - 2;
 
     // validate
-    if (isNaN(period) || period <= 0) {
+    if (!Number.isInteger(period) || period <= 0) {
       showError("Holding period must be a positive whole number.");
       return;
     }

@@ -24,12 +24,12 @@ ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT))
 sys.path.insert(0, str(ROOT / "cli"))
 
-from sound_money_core import (
+from sound_money_core import ( # noqa:E402
     align_and_compute_ratio,
     calculate_success_rate,
     compute_windows,
 )
-from project import fetch_price_data
+from project import fetch_price_data # noqa: E402
 
 OUTPUT_DIR = Path(__file__).resolve().parent
 

@@ -168,7 +168,10 @@ def amend_ratio_with_profitability(
 
     Args:
         ratio_df: Ratio DataFrame from align_and_compute_ratio.
-        windows_df: Windows DataFrame from compute_windows.
+        windows_df: Windows DataFrame from compute_windows, derived from the
+            same ratio_df. That provenance guarantees the date alignment this
+            function relies on; it does not validate windows built from other
+            data.
 
     Returns:
         DataFrame indexed by date with columns "ratio" and "profitable" (bool).

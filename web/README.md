@@ -21,7 +21,7 @@ The chart plots the full ratio history — from the earliest date bitcoin price 
 
 Each point on the line is an entry date. The area beneath it is **green** if a window opening on that date closed profitably, and **red** if it did not. The Historical Success Rate is simply the green share.
 
-With a **gold base**, the chart shows the BTC/Gold ratio in oz of gold per BTC, and historically has been trending up. With a **bitcoin base**, it shows the Gold/BTC ratio in BTC per oz of gold, and historically has been trending down. These are the reciprocal histories with reciprocal charts, not the same chart flipped.  However, the two success rates are exact complements: a window profitable in one base is unprofitable in the other, so the rates sum to 1. (A window that ended exactly where it began would belong to neither. However, at daily float precision that never occurs.)
+With a **gold base**, the chart shows the BTC/Gold ratio in oz of gold per BTC, and historically has been trending up. With a **bitcoin base**, it shows the Gold/BTC ratio in BTC per oz of gold, and historically has been trending down. These are the reciprocal histories with reciprocal charts, not the same chart flipped. However, the two success rates are exact complements: a window profitable in one base is unprofitable in the other, so the rates sum to 1. (A window that ended exactly where it began would count as profitable in neither base, and forward-fill makes such ties structurally possible: a day where both series are gap-filled repeats the previous ratio bit-for-bit. Checked empirically, it doesn't happen: across every holding period tested there is not a single exact tie in this data, because bitcoin trades every calendar day and a simultaneous gap in both series would be very rare. So the complement is exact here, not merely approximate.)
 
 The success rate is a historical frequency, not an infallible forecast. See [Known limitations](#known-limitations).
 
@@ -57,7 +57,7 @@ The refactor was done with a characterization-test first: the loop's exact outpu
 
 The working approach detects same-color runs with `(profitable != profitable.shift()).cumsum()`, splits the frame on those runs, and adds one filled trace per run. This lives in the rendering layer rather than being extracted into the analysis core, because segmenting a series for the renderer's benefit is a rendering concern. It has no analytical meaning.
 
-**Holding-period guard.** `compute_windows` rejects a holding period of `len(ratio_df) - 1` or greater. That is one day shorter than the arithmetic actually requires for plotly to successfully execute a chart. That looks like an off-by-one. It isn't; it's a UX decision, settled by hand-tracing the output rather than by argument. A holding period one day below the arithmetic limit yields a single surviving window, and a chart of a single point has nothing to show: no change in ratio, no fill, no color. Two points is the minimum that renders as a chart with meaningful information, so two points is the floor the guard enforces.
+**Holding-period guard.** `compute_windows` rejects a holding period of `len(ratio_df) - 1` or greater. That looks like an off-by-one. It isn't. Yes, a period of `len(ratio_df) - 1` still yields a single surviving window, and Plotly renders it without complaint: one point, no line, no fill, no color, a chart that shows nothing.  However, two points is the minimum that renders as a chart with meaningful information, so two points is the floor the guard enforces. This is a UX decision, settled by hand-tracing the output rather than by argument alone.
 
 **Why yfinance.** It covers both bitcoin and gold with enough history, and it's free. A paid data source would have made the tool marginally better and dramatically less likely to be run by anyone who isn't me.
 
@@ -69,7 +69,7 @@ The architecture has two halves: a publish pipeline that runs in CI, and a brows
 
 When a visitor submits a holding period and base, four JavaScript functions in `core.js` compute the ratio, classify windows, calculate the success rate, and detect chart segments — mirroring only the downstream arithmetic from `sound_money_core.py`. The chart is rendered by Plotly.js, the same engine the CLI's HTML output uses.
 
-**JS mirror and parity testing.** The browser-side compute means four analytical functions exist in both Python and JavaScript. This is a real duplication cost, accepted because the alternative (a backend server) directly conflicts with the zero-friction static hosting goal. The defense is cross-language characterization testing: the publish pipeline emits a `fixtures.json` file containing Python-computed success rates at a spread of holding periods and both bases, and `test_parity.js` runs in CI before every deploy, asserting that the JS functions reproduce them exactly. If the mirror ever drifts from the Python core, the deploy fails and the site does not update.
+**JS mirror and parity testing.** The browser-side compute means four analytical functions exist in both Python and JavaScript. This is a real duplication cost, accepted because the alternative (a backend server) directly conflicts with the zero-friction static hosting goal. The defense is cross-language characterization testing: the publish pipeline emits a `fixtures.json` file containing Python-computed success rates at a spread of holding periods and both bases, and `test_parity.js` runs in CI before every deploy, asserting that the JS functions reproduce them exactly. If the mirror ever drifts from the Python core, the deploy fails and the site does not update. The parity gate covers the three analytical functions — ratio, windows, success rate. computeSegments sits outside it for the same reason segmenting stays out of the Python core: it is a rendering concern with no analytical meaning to assert against.
 
 ## Known limitations
 
@@ -84,8 +84,9 @@ When a visitor submits a holding period and base, four JavaScript functions in `
 ### Web app
 
 - **Data freshness is daily, not live.** The GitHub Action runs once per day. A visitor sees whatever the most recent run produced, not a live fetch. For a historical-frequency tool this is more than adequate, but the price history will always be at most one day behind.
-- **The JS mirror is a maintenance obligation.** Any future change to the Python core's arithmetic must be made in `core.js` as well. The parity test catches drift but does not eliminate the double work.
+- **The JS mirror is a maintenance obligation.** Any future change to the Python core's arithmetic or presentation labels must be made in `core.js` as well. The parity test catches drift but does not eliminate the double work.
 - **No offline support.** The page fetches `data.json` on every load. If GitHub Pages is unreachable, the page shows a loading error.
+- **Mirror drift introduced by a push is caught at the next deploy, not at push time.** The parity test needs fresh fixtures, which means a live yfinance fetch; running it on every push would make the test suite flaky and lean harder on a free API. The daily deploy is the gate: if a change breaks parity, the next deploy fails and the live site keeps serving the last good build.
 
 ## Project layout
 
