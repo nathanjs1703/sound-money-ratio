@@ -53,7 +53,6 @@ The success rate is a historical frequency, not an infallible forecast. See [Kno
 
 **Monorepo split.** This project has one analytical core and two applications (a CLI and a web app) that present the same analysis to different audiences. They live in a single repository rather than being split into separate packages, because the shared core is a single Python module and the overhead of packaging it would add complexity without solving a problem the project actually has. Each application is a thin caller: neither modifies the core's behavior, and both produce identical analytical results. The directory structure follows from this: the core sits at the repo root, each application has its own subdirectory (`cli/`, `web/`), and each carries its own README documenting application-specific concerns. Design decisions and known limitations that belong to the core are duplicated in both application READMEs so that each stands alone without cross-references.
 
-
 **Base asset neutrality.** The original version hardcoded a hidden premise: _gold is home_. You started in gold, bought bitcoin, sold back to gold, and "profitable" meant ending with more gold. The bias was mostly in the _direction of the question_, not the code. The tool hid the mirror question: was holding gold good for a bitcoin-owner?
 
 Rather than compute the original BTC/Gold and then invert it for the bitcoin case, the chosen base selects the numerator and denominator at construction inside `align_and_compute_ratio`, either `price_btc / price_gold` or `price_gold / price_btc`, both built directly from each dollar-denominated price series. Neither ratio is canonical; neither is derived from the other. A direct division also avoids the float error a reciprocal round-trip can introduce, which matters here because the tests assert exact ratio values in both frames.
@@ -70,7 +69,7 @@ The continuous daily index is also a deliberate model of what a holding period *
 
 Finally, `dropna(subset=["price_btc"])` trims the leading gold-only history. Yahoo Finance has gold back to 2000 and bitcoin only to 2014; there's no ratio to compute before both exist.
 
-**Vectorized windows.** The first version of `compute_windows` looped over `iterrows()`, looking up each exit by date. That was hedging for correctness through a familiar technique and a deliberate choice while learning pandas. It's also the wrong shape for interactive use — any caller that recomputes on every input change would see the loop as visible lag.
+**Vectorized windows.** The first version of `compute_windows` looped over `iterrows()`, looking up each exit by date. That hedged for correctness through a familiar technique, a deliberate choice while learning pandas. It's also the wrong shape for interactive use; any caller that recomputes on every input change would see the loop as visible lag.
 
 The vectorized form is a single row-shift, `ratio_df["ratio"].shift(-N)`, which aligns each entry with its exit for a per-element comparison. **This is only equivalent to the loop's date-based lookup because the index is dense**. It has one row per calendar day, guaranteed upstream by the reindex + ffill above. That cross-function coupling is the assumption the whole vectorization rests on, and it's noted in the docstring for the next person who touches it.
 
@@ -80,13 +79,13 @@ The refactor was done with a characterization-test first: the loop's exact outpu
 
 The working approach detects same-color runs with `(profitable != profitable.shift()).cumsum()`, splits the frame on those runs, and adds one filled trace per run. This lives in the rendering layer rather than being extracted into the analysis core, because segmenting a series for the renderer's benefit is a rendering concern. It has no analytical meaning.
 
-**Holding-period guard.** `compute_windows` rejects a holding period of `len(ratio_df) - 1` or greater. That looks like an off-by-one. It isn't. Yes, a period of `len(ratio_df) - 1` still yields a single surviving window, and Plotly renders it without complaint: one point, no line, no fill, no color, a chart that shows nothing.  However, two points is the minimum that renders as a chart with meaningful information, so two points is the floor the guard enforces. This is a UX decision, settled by hand-tracing the output rather than by argument alone.
+**Holding-period guard.** `compute_windows` rejects a holding period of `len(ratio_df) - 1` or greater. That looks like an off-by-one. It isn't. Yes, a period of `len(ratio_df) - 1` still yields a single surviving window, and Plotly renders it without complaint: one point, no line, no fill, no color, a chart that shows nothing. However, two points is the minimum that renders as a chart with meaningful information, so two points is the floor the guard enforces. This is a UX decision, settled by hand-tracing the output rather than by argument alone.
 
 **Why yfinance.** It covers both bitcoin and gold with enough history, and it's free. A paid data source would have made the tool marginally better and dramatically less likely to be run by anyone who isn't me.
 
 ### Command-line
 
-**Caching and freshness.** Price data is cached to CSV, and re-fetched only when the cache is older than `CACHE_MAX_AGE_IN_DAYS`. Yahoo Finance adds one price per day per asset, so hitting the API on every run buys nothing — a cache that's a few days stale gives the same answer to essentially every question this tool is asked. During development the same cache is what makes it possible to iterate without hammering someone else's free service.
+**Caching and freshness.** Price data is cached to CSV, and re-fetched only when the cache is older than `CACHE_MAX_AGE_IN_DAYS`. Yahoo Finance adds one price per day per asset, so hitting the API on every run buys nothing: a cache that's a few days stale gives the same answer to essentially every question this tool is asked. During development the same cache is what makes it possible to iterate without hammering someone else's free service.
 
 ## Known limitations
 

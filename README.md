@@ -8,7 +8,7 @@
 
 Live at [nathanjs1703.github.io/sound-money-ratio](https://nathanjs1703.github.io/sound-money-ratio/) — no install required.
 
-The proportion of all possible holding periods in which bitcoin has outperformed gold, or gold bitcoin, across their full shared history.
+The proportion of all possible entry dates on which bitcoin went on to outperform gold, or gold bitcoin, across their full shared history.
 
 | Short holds | Long holds |
 |:---:|:---:|
@@ -22,7 +22,7 @@ If you own bitcoin or gold and are considering trading into the other asset and 
 
 The future is opaque, but the past is not. For every day in the price history where someone could have made that trade, this tool checks whether holding for your chosen period would have left them ahead or behind. The share of windows that came out ahead is the answer the tool gives you.
 
-Most bitcoin and gold analysis is denominated in dollars. However, with constant historical debasement distorting the real economic signal I feel it is more instructive to see the direct relationship. Measuring the two hard monetary assets directly against each other helps remove some of that distortion. Thus the non-dollar framing and the symmetry between bitcoin and gold are both intentional design philosophies.
+Most bitcoin and gold analysis is denominated in dollars. However, with constant historical debasement distorting the real economic signal, I feel it is more instructive to see the direct relationship. Measuring the two hard monetary assets directly against each other helps remove some of that distortion. Thus the non-dollar framing and the symmetry between bitcoin and gold are both intentional design philosophies.
 
 ## Two applications
 
