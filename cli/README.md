@@ -85,7 +85,7 @@ The working approach detects same-color runs with `(profitable != profitable.shi
 
 ### Command-line
 
-**Caching and freshness.** Price data is cached to CSV, and re-fetched only when the cache is older than `CACHE_MAX_AGE_IN_DAYS`. Yahoo Finance adds one price per day per asset, so hitting the API on every run buys nothing: a cache that's a few days stale gives the same answer to essentially every question this tool is asked. During development the same cache is what makes it possible to iterate without hammering someone else's free service.
+**Caching and freshness.** Price data is cached to CSV, and re-fetched only when the cache is older than `CACHE_MAX_AGE_IN_DAYS`. Yahoo Finance adds one price per day per asset, so hitting the API on every run buys nothing: a cache that's a few days stale gives the same answer to essentially every question this tool is asked. During development the same cache is what makes it possible to iterate without hammering someone else's free service. The cache folder and the output chart are written relative to your current working directory, so running from the repo root as the Quickstart shows keeps them there. Running from elsewhere simply creates a separate cache in that location; each is self-consistent, so nothing breaks either way.
 
 ## Known limitations
 

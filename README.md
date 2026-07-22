@@ -34,6 +34,12 @@ This project has two applications for two different audiences.
 
 Both applications share a single analytical core (`sound_money_core.py`) and produce identical results.
 
+## Contact
+
+Bug reports and questions: please [open an issue](https://github.com/nathanjs1703/sound-money-ratio/issues).
+
+For anything else, reach me at the email on my [GitHub profile](https://github.com/nathanjs1703).
+
 ## License
 
 MIT (see [LICENSE](LICENSE)).
