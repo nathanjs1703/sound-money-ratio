@@ -89,6 +89,9 @@ function calculateSuccessRate(profitable) {
 
 /**
  * Detect contiguous runs of same profitability for chart coloring.
+ * Each segment includes the next segment's first point so adjacent
+ * fills share their boundary and single-point runs still render; the
+ * borrowed point's flag is ignored since color reads from the run's start.
  * Mirrors generate_chart's segment logic:
  *   (profitable != profitable.shift()).cumsum()
  *
@@ -103,8 +106,8 @@ function computeSegments(dates, ratio, profitable) {
   for (var i = 1; i <= profitable.length; i++) {
     if (i === profitable.length || profitable[i] !== profitable[segStart]) {
       segments.push({
-        dates: dates.slice(segStart, i),
-        ratios: ratio.slice(segStart, i),
+        dates: dates.slice(segStart, i + 1),
+        ratios: ratio.slice(segStart, i + 1),
         profitable: profitable[segStart],
       });
       segStart = i;

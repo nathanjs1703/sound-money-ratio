@@ -13,7 +13,7 @@ The proportion of all possible entry dates on which bitcoin went on to outperfor
 | Short holds | Long holds |
 |:---:|:---:|
 | ![BTC/Gold ratio, 30-day hold — green and red windows in roughly even stripes](assets/chart-30d.png) | ![BTC/Gold ratio, 752-day hold — mostly green with occasional red bands](assets/chart-752d.png) |
-| Gold base, 30-day hold · as of 2026-07-14 · near even | Gold base, 752-day hold · as of 2026-07-14 · 75.2% of windows profitable |
+| Gold base, 30-day hold · as of 2026-07-23 · near even | Gold base, 752-day hold · as of 2026-07-23 · 74.9% of windows profitable |
 
 
 ## What this answers

@@ -55,7 +55,9 @@ The refactor was done with a characterization-test first: the loop's exact outpu
 
 **Segment-based chart coloring.** The commonly known way to get a two-color fill in Plotly is the "NaN trick": two traces, one green and one red, each holding `NaN` wherever the other color applies. It doesn't work with `fill="tozeroy"` and that is a known Plotly.js rendering bug, and the result was the entire area filled brown.
 
-The working approach detects same-color runs with `(profitable != profitable.shift()).cumsum()`, splits the frame on those runs, and adds one filled trace per run. This lives in the rendering layer rather than being extracted into the analysis core, because segmenting a series for the renderer's benefit is a rendering concern. It has no analytical meaning.
+The working approach detects same-color runs with `(profitable != profitable.shift()).cumsum()`, splits the frame on those runs, and adds one filled trace per run. Each segment is then extended by one point or day to the next, closing what otherwise would be an apparent gap between each segment. One day runs would otherwise appear as blank gaps. The area between one entry date and the next therefore takes the earlier date's color: the region to the right of a point represents that point's window outcome.
+
+This lives in the rendering layer rather than being extracted into the analysis core, because segmenting a series for the renderer's benefit is a rendering concern. It has no analytical meaning.
 
 **Holding-period guard.** `compute_windows` rejects a holding period of `len(ratio_df) - 1` or greater. That looks like an off-by-one. It isn't. Yes, a period of `len(ratio_df) - 1` still yields a single surviving window, and Plotly renders it without complaint: one point, no line, no fill, no color, a chart that shows nothing. However, two points is the minimum that renders as a chart with meaningful information, so two points is the floor the guard enforces. This is a UX decision, settled by hand-tracing the output rather than by argument alone.
 

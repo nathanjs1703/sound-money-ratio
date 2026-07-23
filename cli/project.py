@@ -108,7 +108,14 @@ def generate_chart(
     fig = go.Figure()
 
     # iterate fill color by segment
-    for _, segment_df in ratio_df.groupby("segment"):
+    segment_frames = [frame for _, frame in ratio_df.groupby("segment")]
+    for i, segment_df in enumerate(segment_frames):
+        # extend each segment with the next segment's first row so adjacent
+        # fills share their boundary point (no unfilled sliver, and one-point
+        # runs still render). the borrowed row's profitable value is
+        # deliberately ignored: color reads from the segment's first row.
+        if i + 1 < len(segment_frames):
+            segment_df = pd.concat([segment_df, segment_frames[i + 1].iloc[[0]]])
         color = (
             "rgba(0, 255, 0, 0.5)"
             if segment_df["profitable"].iloc[0]
