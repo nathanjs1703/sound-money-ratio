@@ -22,7 +22,7 @@ jobs:
       - name: Install dependencies
         run: |
           pip install -r requirements.txt
-          pip install ruff mypy
+          pip install ruff==0.15.22 mypy==2.3.0
 
       - name: Lint
         run: ruff check .
